@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:clock/clock.dart';
-import 'package:flutter_cache_manager/src/web/mime_converter.dart';
 import 'package:http/http.dart' as http;
 
 ///Flutter Cache Manager
@@ -55,11 +54,11 @@ abstract class FileServiceResponse {
   /// Defines till when the cache should be assumed to be valid.
   DateTime get validTill;
 
-  /// [eTag] is used when asking to update the cache
+  /// [eTag] is used when asking to update the cache.
   String? get eTag;
 
-  /// Used to save the file on the storage, includes a dot. For example '.jpeg'
-  String get fileExtension;
+  /// Used to save the file on the storage.
+  String get fileName;
 }
 
 /// Basic implementation of a [FileServiceResponse] for http requests.
@@ -112,13 +111,10 @@ class HttpGetResponse implements FileServiceResponse {
   String? get eTag => _header(HttpHeaders.etagHeader);
 
   @override
-  String get fileExtension {
-    var fileExtension = '';
-    final contentTypeHeader = _header(HttpHeaders.contentTypeHeader);
-    if (contentTypeHeader != null) {
-      final contentType = ContentType.parse(contentTypeHeader);
-      fileExtension = contentType.fileExtension;
-    }
-    return fileExtension;
+  String get fileName {
+    final contentDisposition = _header(HttpHeaders.contentDisposition) ?? "";
+    final fileName = RegExp(r"filename\*?=([^']*'')?([^;]*)").firstMatch(contentDisposition)?[2];
+
+    return fileName ?? "";
   }
 }

@@ -182,10 +182,7 @@ class CacheStore {
     if (_futureCache.containsKey(cacheObject.key)) {
       _futureCache.remove(cacheObject.key);
     }
-    final file = await fileSystem.createFile(cacheObject.relativePath);
-    if (await file.exists()) {
-      await file.delete();
-    }
+    await fileSystem.deleteFile(cacheObject.relativePath);
   }
 
   Future<void> dispose() async {

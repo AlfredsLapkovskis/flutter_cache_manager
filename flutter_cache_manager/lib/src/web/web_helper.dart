@@ -158,16 +158,16 @@ class WebHelper {
 
   CacheObject _setDataFromHeaders(
       CacheObject cacheObject, FileServiceResponse response) {
-    final fileExtension = response.fileExtension;
+    final newFilePath = _store.fileSystem.createRelativePath(fileName: response.fileName);
     var filePath = cacheObject.relativePath;
 
     if (!statusCodesFileNotChanged.contains(response.statusCode)) {
-      if (!filePath.endsWith(fileExtension)) {
+      if (!filePath.endsWith(newFilePath)) {
         //Delete old file directly when file extension changed
         _removeOldFile(filePath);
       }
       // Store new file on different path
-      filePath = '${const Uuid().v1()}$fileExtension';
+      filePath = newFilePath;
     }
     return cacheObject.copyWith(
       relativePath: filePath,
@@ -208,10 +208,7 @@ class WebHelper {
 
   Future<void> _removeOldFile(String? relativePath) async {
     if (relativePath == null) return;
-    final file = await _store.fileSystem.createFile(relativePath);
-    if (await file.exists()) {
-      await file.delete();
-    }
+    await _store.fileSystem.deleteFile(relativePath);
   }
 }
 

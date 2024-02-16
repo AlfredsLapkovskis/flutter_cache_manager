@@ -7,7 +7,6 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_cache_manager/src/cache_store.dart';
 import 'package:flutter_cache_manager/src/storage/cache_object.dart';
 import 'package:flutter_cache_manager/src/web/web_helper.dart';
-import 'package:uuid/uuid.dart';
 
 ///Flutter Cache Manager
 ///Copyright (c) 2019 Rene Floor
@@ -200,14 +199,15 @@ class CacheManager implements BaseCacheManager {
     String? key,
     String? eTag,
     Duration maxAge = const Duration(days: 30),
-    String fileExtension = 'file',
+    String fileName = '',
+    String fileExtension = '',
   }) async {
     key ??= url;
     var cacheObject = await _store.retrieveCacheData(key);
     cacheObject ??= CacheObject(
       url,
       key: key,
-      relativePath: '${const Uuid().v1()}.$fileExtension',
+      relativePath: _config.fileSystem.createRelativePath(fileName: fileName, fileExtension: fileExtension),
       validTill: DateTime.now().add(maxAge),
     );
 
@@ -236,15 +236,17 @@ class CacheManager implements BaseCacheManager {
     String? key,
     String? eTag,
     Duration maxAge = const Duration(days: 30),
-    String fileExtension = 'file',
+    String fileName = '',
+    String fileExtension = '',
   }) async {
     key ??= url;
     var cacheObject = await _store.retrieveCacheData(key);
-    cacheObject ??= CacheObject(url,
-        key: key,
-        relativePath: '${const Uuid().v1()}'
-            '.$fileExtension',
-        validTill: DateTime.now().add(maxAge));
+    cacheObject ??= CacheObject(
+      url,
+      key: key,
+      relativePath: _config.fileSystem.createRelativePath(fileName: fileName, fileExtension: fileExtension),
+      validTill: DateTime.now().add(maxAge),
+    );
 
     cacheObject = cacheObject.copyWith(
       validTill: DateTime.now().add(maxAge),

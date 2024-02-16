@@ -1,5 +1,7 @@
 import 'package:file/file.dart';
 
 abstract class FileSystem {
-  Future<File> createFile(String name);
+  String createRelativePath({String fileName = "", String fileExtension = ""});
+  Future<File> createFile(String relativePath);
+  Future<void> deleteFile(String relativePath);
 }

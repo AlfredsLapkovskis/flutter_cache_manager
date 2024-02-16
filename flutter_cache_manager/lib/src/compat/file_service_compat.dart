@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:clock/clock.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
-import 'package:flutter_cache_manager/src/web/mime_converter.dart';
 
 class FileServiceCompat extends FileService {
   final FileFetcher fileFetcher;
@@ -62,14 +61,11 @@ class CompatFileServiceGetResponse implements FileServiceResponse {
   String? get eTag => _header(HttpHeaders.etagHeader);
 
   @override
-  String get fileExtension {
-    var fileExtension = '';
-    final contentTypeHeader = _header(HttpHeaders.contentTypeHeader);
-    if (contentTypeHeader != null) {
-      final contentType = ContentType.parse(contentTypeHeader);
-      fileExtension = contentType.fileExtension;
-    }
-    return fileExtension;
+  String get fileName {
+    final contentDisposition = _header(HttpHeaders.contentDisposition) ?? "";
+    final fileName = RegExp(r"filename\*?=([^']*'')?([^;]*)").firstMatch(contentDisposition)?[2];
+
+    return fileName ?? "";
   }
 
   @override
