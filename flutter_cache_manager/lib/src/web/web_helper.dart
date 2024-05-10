@@ -30,16 +30,19 @@ class WebHelper {
   final Queue<QueueItem> _queue = Queue();
 
   ///Download the file from the url
-  Stream<FileResponse> downloadFile(String url,
-      {String? key,
-      Map<String, String>? authHeaders,
-      bool ignoreMemCache = false}) {
+  Stream<FileResponse> downloadFile(
+    String url, {
+    String? key,
+    String fileName = '',
+    Map<String, String>? authHeaders,
+    bool ignoreMemCache = false,
+  }) {
     key ??= url;
     var subject = _memCache[key];
     if (subject == null || ignoreMemCache) {
       subject = BehaviorSubject<FileResponse>();
       _memCache[key] = subject;
-      _downloadOrAddToQueue(url, key, authHeaders);
+      _downloadOrAddToQueue(url, key, fileName, authHeaders);
     }
     return subject.stream;
   }
@@ -49,21 +52,20 @@ class WebHelper {
   Future<void> _downloadOrAddToQueue(
     String url,
     String key,
+    String fileName,
     Map<String, String>? authHeaders,
   ) async {
     //Add to queue if there are too many calls.
     if (concurrentCalls >= fileFetcher.concurrentFetches) {
-      _queue.add(QueueItem(url, key, authHeaders));
+      _queue.add(QueueItem(url, key, fileName, authHeaders));
       return;
     }
-    cacheLogger.log(
-        'CacheManager: Downloading $url', CacheManagerLogLevel.verbose);
+    cacheLogger.log('CacheManager: Downloading $url', CacheManagerLogLevel.verbose);
 
     concurrentCalls++;
     final subject = _memCache[key]!;
     try {
-      await for (final result
-          in _updateFile(url, key, authHeaders: authHeaders)) {
+      await for (final result in _updateFile(url, key, fileName: fileName, authHeaders: authHeaders)) {
         subject.add(result);
       }
     } on Object catch (e, stackTrace) {
@@ -79,12 +81,16 @@ class WebHelper {
   void _checkQueue() {
     if (_queue.isEmpty) return;
     final next = _queue.removeFirst();
-    _downloadOrAddToQueue(next.url, next.key, next.headers);
+    _downloadOrAddToQueue(next.url, next.key, next.fileName, next.headers);
   }
 
   ///Download the file from the url
-  Stream<FileResponse> _updateFile(String url, String key,
-      {Map<String, String>? authHeaders}) async* {
+  Stream<FileResponse> _updateFile(
+    String url,
+    String key, {
+    String fileName = '',
+    Map<String, String>? authHeaders,
+  }) async* {
     var cacheObject = await _store.retrieveCacheData(key);
     cacheObject = cacheObject == null
         ? CacheObject(
@@ -95,11 +101,10 @@ class WebHelper {
           )
         : cacheObject.copyWith(url: url);
     final response = await _download(cacheObject, authHeaders);
-    yield* _manageResponse(cacheObject, response);
+    yield* _manageResponse(cacheObject, response, fileName);
   }
 
-  Future<FileServiceResponse> _download(
-      CacheObject cacheObject, Map<String, String>? authHeaders) {
+  Future<FileServiceResponse> _download(CacheObject cacheObject, Map<String, String>? authHeaders) {
     final headers = <String, String>{};
     if (authHeaders != null) {
       headers.addAll(authHeaders);
@@ -115,8 +120,7 @@ class WebHelper {
     return fileFetcher.get(cacheObject.url, headers: headers);
   }
 
-  Stream<FileResponse> _manageResponse(
-      CacheObject cacheObject, FileServiceResponse response) async* {
+  Stream<FileResponse> _manageResponse(CacheObject cacheObject, FileServiceResponse response, String fileName) async* {
     final hasNewFile = statusCodesNewFile.contains(response.statusCode);
     final keepOldFile = statusCodesFileNotChanged.contains(response.statusCode);
     if (!hasNewFile && !keepOldFile) {
@@ -128,13 +132,12 @@ class WebHelper {
     }
 
     final oldCacheObject = cacheObject;
-    var newCacheObject = _setDataFromHeaders(cacheObject, response);
+    var newCacheObject = _setDataFromHeaders(cacheObject, response, fileName);
     if (statusCodesNewFile.contains(response.statusCode)) {
       var savedBytes = 0;
       await for (final progress in _saveFile(newCacheObject, response)) {
         savedBytes = progress;
-        yield DownloadProgress(
-            cacheObject.url, response.contentLength, progress);
+        yield DownloadProgress(cacheObject.url, response.contentLength, progress);
       }
       newCacheObject = newCacheObject.copyWith(length: savedBytes);
     }
@@ -156,9 +159,8 @@ class WebHelper {
     );
   }
 
-  CacheObject _setDataFromHeaders(
-      CacheObject cacheObject, FileServiceResponse response) {
-    final newFilePath = _store.fileSystem.createRelativePath(fileName: response.fileName);
+  CacheObject _setDataFromHeaders(CacheObject cacheObject, FileServiceResponse response, String fileName) {
+    final newFilePath = _store.fileSystem.createRelativePath(fileName: fileName.isNotEmpty ? fileName : response.fileName);
     var filePath = cacheObject.relativePath;
 
     if (!statusCodesFileNotChanged.contains(response.statusCode)) {
@@ -186,10 +188,7 @@ class WebHelper {
     return receivedBytesResultController.stream;
   }
 
-  Future<void> _saveFileAndPostUpdates(
-      StreamController<int> receivedBytesResultController,
-      CacheObject cacheObject,
-      FileServiceResponse response) async {
+  Future<void> _saveFileAndPostUpdates(StreamController<int> receivedBytesResultController, CacheObject cacheObject, FileServiceResponse response) async {
     final file = await _store.fileSystem.createFile(cacheObject.relativePath);
 
     try {
@@ -213,8 +212,7 @@ class WebHelper {
 }
 
 class HttpExceptionWithStatus extends HttpException {
-  const HttpExceptionWithStatus(this.statusCode, String message, {Uri? uri})
-      : super(message, uri: uri);
+  const HttpExceptionWithStatus(this.statusCode, String message, {Uri? uri}) : super(message, uri: uri);
 
   final int statusCode;
 }
